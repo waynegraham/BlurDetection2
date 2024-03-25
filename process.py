@@ -1,3 +1,5 @@
+from ast import arg, mod
+import re
 import sys
 import argparse
 import logging
@@ -5,6 +7,7 @@ import pathlib
 import json
 
 import cv2
+import pandas as pd
 
 from blur_detection import estimate_blur
 from blur_detection import fix_image_size
@@ -15,6 +18,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description='run blur detection on a single image')
     parser.add_argument('-i', '--images', type=str, nargs='+', required=True, help='directory of images')
     parser.add_argument('-s', '--save-path', type=str, default=None, help='path to save output')
+    parser.add_argument('-o',
+                        '--output-format',
+                        type=str,
+                        default='json',
+                        choices=['csv', 'json'],
+                        help='output format')
 
     parser.add_argument('-t', '--threshold', type=float, default=100.0, help='blurry threshold')
     parser.add_argument('-f', '--variable-size', action='store_true', help='fix the image size')
@@ -26,6 +35,16 @@ def parse_args():
 
 
 def find_images(image_paths, img_extensions=['.jpg', '.png', '.jpeg']):
+    """
+    Finds images in a directory based on the image extensions
+
+    Args:
+        image_paths (string): Path to directory containing images
+        img_extensions (list, optional): Tuple of file extensions to glob in a directory. Defaults to ['.jpg', '.png', '.jpeg'].
+
+    Yields:
+        Path: Recurive glob of all images in the directory
+    """
     img_extensions += [i.upper() for i in img_extensions]
 
     for path in image_paths:
@@ -44,7 +63,7 @@ def find_images(image_paths, img_extensions=['.jpg', '.png', '.jpeg']):
 
 
 if __name__ == '__main__':
-    assert sys.version_info >= (3, 6), sys.version_info
+    assert sys.version_info >= (3, 11), sys.version_info
     args = parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
@@ -55,7 +74,8 @@ if __name__ == '__main__':
 
     if args.save_path is not None:
         save_path = pathlib.Path(args.save_path)
-        assert save_path.suffix == '.json', save_path.suffix
+        valid_extensions = ('.json', '.csv')
+        assert save_path.suffix in valid_extensions, save_path.suffix
     else:
         save_path = None
 
@@ -87,9 +107,26 @@ if __name__ == '__main__':
                 logging.info('exiting...')
                 exit()
 
-    if save_path is not None:
-        logging.info(f'saving json to {save_path}')
+    # if save_path is not None:
+    #     logging.info(f'saving data to {save_path}')
 
-        with open(save_path, 'w') as result_file:
-            data = {'images': args.images, 'threshold': args.threshold, 'fix_size': fix_size, 'results': results}
-            json.dump(data, result_file, indent=4)
+    #     with open(save_path, 'w') as result_file:
+    #         data = {'images': args.images, 'threshold': args.threshold, 'fix_size': fix_size, 'results': results}
+    #         json.dump(data, result_file, indent=4)
+
+    if args.output_format is not None:
+        logging.info(f'Saving output to {save_path}')
+        if args.output_format == 'csv':
+            logging.info(f'Converting to CSV and saving data to {save_path}')
+
+            df = pd.DataFrame(results)
+            print(df.head())
+            df.sort_values('input_path', ascending=False)
+            df.to_csv(save_path, index=False)
+        elif args.output_format == 'json':
+            logging.info(f'saving data to {save_path}')
+            with open(save_path, 'w') as result_file:
+                data = {'images': args.images, 'threshold': args.threshold, 'fix_size': fix_size, 'results': results}
+                json.dump(data, result_file, indent=4)
+        else:
+            raise NotImplementedError('output format not implemented')

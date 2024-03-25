@@ -5,6 +5,16 @@ import numpy
 
 
 def fix_image_size(image: numpy.array, expected_pixels: float = 2E6):
+    """
+    Fix the size of the image to a given number of pixels
+
+    Args:
+        image (numpy.array): Image to resize converted to an array
+        expected_pixels (float, optional): Expected number of pixels in the image. Defaults to 2E6.
+
+    Returns:
+        (cv2.image): Resized image
+    """
     ratio = numpy.sqrt(expected_pixels / (image.shape[0] * image.shape[1]))
     return cv2.resize(image, (0, 0), fx=ratio, fy=ratio)
 
